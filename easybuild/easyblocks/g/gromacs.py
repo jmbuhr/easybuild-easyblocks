@@ -66,7 +66,7 @@ class EB_GROMACS(CMakeMake):
             'mpisuffix': ['_mpi', "Suffix to append to MPI-enabled executables (only for GROMACS < 4.6)", CUSTOM],
             'mpiexec': ['mpirun', "MPI executable to use when running tests", CUSTOM],
             'mpiexec_numproc_flag': ['-np', "Flag to introduce the number of MPI tasks when running tests", CUSTOM],
-            'mpi_numprocs': [0, "Number of MPI tasks to use when running tests", CUSTOM],
+            'mpi_numprocs': [0, "Number of MPI tasks to use when running tests", CUSTOM]
         })
         extra_vars['separate_build_dir'][0] = True
         return extra_vars
@@ -163,6 +163,16 @@ class EB_GROMACS(CMakeMake):
 
     def configure_step(self):
         """Custom configuration procedure for GROMACS: set configure options for configure or cmake."""
+        print("hello from libcp2k configuration")
+
+        # add suport for QMMM engines the starting from <https://gitlab.com/gromacs/gromacs/-/tree/2021.2-qmmm>
+        cp2k = get_software_root('CP2K')
+        if cp2k:
+            self.cfg.update('configopts', '-DGMX_CP2K=ON')
+            self.cfg.update('configopts', '-DGMXAPI=OFF')
+            self.cfg.update('configopts', '-DGMX_INSTALL_NBLIB_API=OFF')
+            self.cfg.update('configopts', '-DCP2K_DIR=%s/lib' % cp2k)
+            self.cfg.update('configopts', '-DCP2K_LIBS=-lxsmm -lxsmmf')
 
         if LooseVersion(self.version) >= LooseVersion('4.6'):
             cuda = get_software_root('CUDA')
