@@ -46,7 +46,7 @@ from easybuild.easyblocks.generic.cmakemake import CMakeMake
 from easybuild.framework.easyconfig import CUSTOM
 from easybuild.tools.build_log import EasyBuildError, print_warning
 from easybuild.tools.config import build_option
-from easybuild.tools.filetools import copy_dir, find_backup_name_candidate, remove_dir, which
+from easybuild.tools.filetools import copy_dir, find_backup_name_candidate, remove_dir, which, change_dir
 from easybuild.tools.modules import get_software_libdir, get_software_root, get_software_version
 from easybuild.tools.run import run_cmd
 from easybuild.tools.toolchain.compiler import OPTARCH_GENERIC
@@ -167,12 +167,49 @@ class EB_GROMACS(CMakeMake):
 
         # add suport for QMMM engines the starting from <https://gitlab.com/gromacs/gromacs/-/tree/2021.2-qmmm>
         cp2k = get_software_root('CP2K')
+
         if cp2k:
+            # libs used by cp2k from easybuild log
+            plumed = get_software_root('PLUMED')
+            fftw = get_software_root('FFTW')
+            libxsmm = get_software_root('libxsmm')
+            libxc = get_software_root('libxc')
+            libint = get_software_root('Libint')
+            # bison = get_software_root('bison')
+            # flex = get_software_root('flex')
+            scalapack = get_software_root('ScaLAPACK')
+            openblas = get_software_root('OpenBLAS')
+            gcc_core = get_software_root('GCCcore')
+
             self.cfg.update('configopts', '-DGMX_CP2K=ON')
             self.cfg.update('configopts', '-DGMXAPI=OFF')
             self.cfg.update('configopts', '-DGMX_INSTALL_NBLIB_API=OFF')
-            self.cfg.update('configopts', '-DCP2K_DIR=%s/lib' % cp2k)
-            self.cfg.update('configopts', '-DCP2K_LIBS=-lxsmm -lxsmmf')
+            self.cfg.update('configopts', '-DCP2K_DIR="%s/lib"' % cp2k)
+
+            cp2k_libs_config = ' -Wl,--enable-new-dtags -pthread'
+            cp2k_libs_config += ' -L%s/lib' % plumed
+            cp2k_libs_config += ' -L%s/lib64' % plumed
+            cp2k_libs_config += ' -L%s/lib' % fftw
+            cp2k_libs_config += ' -L%s/lib64' % fftw
+            cp2k_libs_config += ' -L%s/lib' % libxsmm
+            cp2k_libs_config += ' -L%s/lib64' % libxsmm
+            cp2k_libs_config += ' -L%s/lib' % libxc
+            cp2k_libs_config += ' -L%s/lib64' % libxc
+            cp2k_libs_config += ' -L%s/lib' % libint
+            cp2k_libs_config += ' -L%s/lib64' % libint
+            # cp2k_libs_config += ' -L%s/lib' % bison
+            # cp2k_libs_config += ' -L%s/lib64' % bison
+            # cp2k_libs_config += ' -L%s/lib' % flex
+            # cp2k_libs_config += ' -L%s/lib64' % flex
+            cp2k_libs_config += ' -L%s/lib' % scalapack
+            cp2k_libs_config += ' -L%s/lib64' % scalapack
+            cp2k_libs_config += ' -L%s/lib' % openblas
+            cp2k_libs_config += ' -L%s/lib64' % openblas
+            cp2k_libs_config += ' -L%s/lib' % gcc_core
+            cp2k_libs_config += ' -L%s/lib64' % gcc_core
+            cp2k_libs_config += ' -lplumed -lfftw3_mpi -lfftw3 -lfftw3_omp -lxsmmf -lxsmm -ldl -lpthread -lxcf03 -lxc -lint2 -lmpi -lopenblas -lstdc++ -lscalapack'
+
+            self.cfg.update('configopts', '-DCP2K_LIBS=' + '"' + cp2k_libs_config + '"')
 
         if LooseVersion(self.version) >= LooseVersion('4.6'):
             cuda = get_software_root('CUDA')
@@ -296,7 +333,8 @@ class EB_GROMACS(CMakeMake):
                               mpiexec_path, self.cfg.get('mpiexec_numproc_flag'),
                               mpi_numprocs)
 
-            if LooseVersion(self.version) >= LooseVersion('2019'):
+            if LooseVersion(self.version) >= LooseVersion('2019') and not cp2k:
+                # python api currently disabled for qmmm branch
                 # Building the gmxapi interface requires shared libraries,
                 # this is handled in the class initialisation so --module-only works
                 self.cfg.update('configopts', "-DGMXAPI=ON")
